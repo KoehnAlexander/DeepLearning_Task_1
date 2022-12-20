@@ -9,14 +9,15 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_recommenders as tfrs
 
+import matplotlib.pyplot as plt
+
+
 ratings = tfds.load("movielens/100k-ratings", split="train")
 
 ratings = ratings.map(lambda x: {
     "movie_title": x["movie_title"],
     "user_id": x["user_id"],
     "user_rating": x["user_rating"],
-    #"raw_user_age": x["raw_user_age"],
-    "timestamp": x["timestamp"]
 })
 
 tf.random.set_seed(53)
@@ -32,16 +33,8 @@ unique_movie_titles = np.unique(np.concatenate(list(movie_titles)))
 
 unique_user_ids = np.unique(np.concatenate(list(user_ids)))
 
-max_timestamp = ratings.map(lambda x: x["timestamp"]).reduce(
-    tf.cast(0, tf.int64), tf.maximum).numpy().max()
-min_timestamp = ratings.map(lambda x: x["timestamp"]).reduce(
-    np.int64(1e9), tf.minimum).numpy().min()
 
-timestamp_buckets = np.linspace(
-    min_timestamp, max_timestamp, num=1000)
-
-
-class RankingModel(tf.keras.Model):
+class RankingModel(tfrs.models.Model):
 
     def __init__(self):
         super().__init__()
@@ -52,11 +45,6 @@ class RankingModel(tf.keras.Model):
             tf.keras.layers.StringLookup(
                 vocabulary=unique_user_ids, mask_token=None),
             tf.keras.layers.Embedding(len(unique_user_ids) + 1, embedding_dimension)
-        ])
-
-        self.timestamp_embedding = tf.keras.Sequential([
-            tf.keras.layers.Discretization(timestamp_buckets.tolist()),
-            tf.keras.layers.Embedding(len(timestamp_buckets) + 2, 32)
         ])
 
         # Compute embeddings for movies.
@@ -75,29 +63,19 @@ class RankingModel(tf.keras.Model):
             tf.keras.layers.Dense(1)
         ])
 
-    def call(self, inputs):
-        user_id, movie_title, timestamp = inputs
-
-        user_embedding = self.user_embeddings(user_id)
-        movie_embedding = self.movie_embeddings(movie_title)
-        timestamp_embedding = self.timestamp_embedding(timestamp),
-
-        return self.ratings(tf.concat([user_embedding, movie_embedding, timestamp_embedding], axis=1))
-
-
-class MovielensModel(tfrs.models.Model):
-
-    def __init__(self):
-        super().__init__()
-        self.ranking_model: tf.keras.Model = RankingModel()
         self.task: tf.keras.layers.Layer = tfrs.tasks.Ranking(
             loss=tf.keras.losses.MeanSquaredError(),
             metrics=[tf.keras.metrics.RootMeanSquaredError()]
         )
 
     def call(self, features: Dict[str, tf.Tensor]) -> tf.Tensor:
-        return self.ranking_model(
-            (features["user_id"], features["movie_title"], features["timestamp"]))
+        user_id = features["user_id"]
+        movie_title = features["movie_title"]
+
+        user_embedding = self.user_embeddings(user_id)
+        movie_embedding = self.movie_embeddings(movie_title)
+
+        return self.ratings(tf.concat([user_embedding, movie_embedding], axis=1))
 
     def compute_loss(self, features: Dict[Text, tf.Tensor], training=False) -> tf.Tensor:
         labels = features.pop("user_rating")
@@ -123,19 +101,39 @@ class MovielensModel(tfrs.models.Model):
             test_ratings_combined[movie_title] = (test_ratings_1[movie_title] + test_ratings_2[movie_title]) / 2
 
         test_ratings_combined = sorted(test_ratings_combined.items(), key=lambda x: x[1], reverse=True)
+        print("Recommendation for the two users: \n")
         for title, score in test_ratings_combined[:10]:
             print(f"{title}: {score}")
 
 
-model = MovielensModel()
+
+model = RankingModel()
 model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))
 
-cached_train = train.shuffle(100_000).batch(8192).cache()
-cached_test = test.batch(4096).cache()
+cached_train = train.shuffle(100_000).batch(65536).cache()
+cached_test = test.batch(16384).cache()
 
-model.fit(cached_train, epochs=3)
+history = model.fit(cached_train, epochs=50, validation_data=cached_test)
 
-model.evaluate(cached_test, return_dict=True)
+plt.plot(history.history["loss"])
+plt.plot(history.history["val_loss"])
+plt.title("model loss")
+plt.ylabel("loss")
+plt.xlabel("epoch")
+plt.legend(["train", "test"], loc="upper left")
+plt.show()
+
+plt.plot(history.history["root_mean_squared_error"])
+plt.plot(history.history["val_root_mean_squared_error"])
+plt.title("model error")
+plt.ylabel("error")
+plt.xlabel("epoch")
+plt.legend(["train", "test"], loc="upper left")
+plt.show()
+
+
+evaluation = model.evaluate(cached_test, return_dict=True)
+
 
 user_1 = np.array(["42"])
 user_2 = np.array(["72"])
