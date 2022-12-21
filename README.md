@@ -4,6 +4,10 @@ Welcome to my software contribution.
 
 I worked on both tasks. Task 1 was my main goal and I tried my best. I worked on Task 2 to learn a bit more. So there might be some interesting things, too.
 
+## Binder to Task 1
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/KoehnAlexander/DeepLearning_Task_1/HEAD)
+
+
 This project was developed in pycharm.
 
 The requirements.txt consists of the requirements for task 1.
