@@ -8,13 +8,11 @@ I worked on both tasks. Task 1 was my main goal and I tried my best. I worked on
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/KoehnAlexander/DeepLearning_Task_1/HEAD)
 
 
-This project was developed in pycharm.
+This project was developed in pycharm. I tested it on binder and it has worked there.
 
-The requirements.txt consists of the requirements for task 1.
-
-I only used the normal packages, so I think it should function on any workstation.
+I only used the normal packages, so I think it should work on any workstation.
 
 
-My final report is included in the task 1 over the code in different section, but in my opininion this makes it more understandable.
+My final report is included in the task 1 over the code in different section, in my opinion this makes it more understandable.
 
-The comments to the Tutorials are in this repo, too
+The comments to the Tutorials are in this repo, too.
